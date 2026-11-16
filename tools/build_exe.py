@@ -38,8 +38,11 @@ no browser needed, and it works without internet (only the automatic PIN code
 look-up needs a connection). Closing the window stops the tool.
 Nothing needs installing (it uses Microsoft Edge WebView2, built into Windows 10/11).
 
-Your client details are saved in the "data" folder created next to the .exe.
-To move to a new version, copy that "data" folder next to the new .exe.
+Your client details are saved on this computer only, in one fixed place:
+  %LOCALAPPDATA%\\IPO Form Filler\\data
+Every copy and every new version of the app uses them automatically - to
+update, just run the new .exe; there is nothing to copy. (The Home screen
+shows this folder and has an "Open folder" button for backups.)
 
 If Windows shows "Windows protected your PC": click "More info", then
 "Run anyway". (The app is not code-signed, so Windows doesn't recognise it yet.)

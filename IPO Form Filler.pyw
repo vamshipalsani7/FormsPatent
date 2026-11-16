@@ -207,6 +207,16 @@ class DesktopApi:
             webbrowser.open(p.as_uri())
         return True
 
+    def open_data_folder(self) -> bool:
+        """Show the folder where clients are kept (for backups)."""
+        from ipoforms.paths import data_dir
+        folder = data_dir()
+        if hasattr(os, "startfile"):
+            os.startfile(str(folder))  # noqa: S606 - the app's own data folder
+        else:
+            webbrowser.open(folder.as_uri())
+        return True
+
     def show_pdf(self, path: str, title: str = "Official form") -> bool:
         """Show an official blank PDF in a window of its own."""
         import webview
@@ -266,7 +276,7 @@ def run_desktop(url: str, check: bool = False, own_server: bool = True) -> bool:
         window.destroy()
 
     # Window storage (unsaved-change drafts) is kept between runs.
-    storage = paths.FALLBACK_DATA_DIR.parent / "WebView"
+    storage = paths.APP_DATA_ROOT / "WebView"
     icon = Path(getattr(sys, "_MEIPASS", ROOT)) / "app.ico"
     try:
         webview.start(after_start, gui="edgechromium" if os.name == "nt" else None,
@@ -320,13 +330,18 @@ def main() -> None:
         print("launcher check:", "OK" if ok else "FAILED", url, "| data:", paths.data_dir())
         sys.exit(0 if ok else 1)
 
-    if paths.running_from_temp():
-        show_message("IPO Form Filler - please unzip first",
-                     "It looks like IPO Form Filler was opened from inside the zip file.\n\n"
-                     "It will work, but to keep your clients safe they are being saved in:\n"
-                     f"{paths.data_dir()}\n\n"
-                     "Next time, right-click the zip, choose 'Extract All…', and run "
-                     "IPO Form Filler.exe from the extracted folder.", warning=True)
+    # Versions 1.1 - 1.2.1 kept clients in a "data" folder next to the .exe.
+    # Bring those in once; from now on every copy uses the one fixed folder.
+    for old in paths.legacy_data_dirs():
+        added = server.STORE.import_once(old / "clients.json")
+        if added:
+            show_message("IPO Form Filler - clients moved",
+                         f"{added} client{'s' if added != 1 else ''} saved by an earlier version "
+                         f"(in {old}) {'have' if added != 1 else 'has'} been brought in.\n\n"
+                         "From now on all your clients are kept in one place on this computer:\n"
+                         f"{paths.data_dir()}\n\n"
+                         "Any copy or newer version of the app uses them automatically - nothing to copy. "
+                         "The old folder next to the app is no longer used and can be deleted.")
 
     # Preferred: the tool's own window. Closing it stops the tool.
     if run_desktop(url):

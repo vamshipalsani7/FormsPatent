@@ -417,6 +417,50 @@ class ClientStore:
             self._write(data)
         return True
 
+    # ---- bringing in clients saved by an older version -----------------------
+    @property
+    def _imports_path(self) -> Path:
+        return self.path.with_name("imported-from.json")
+
+    def import_once(self, other_file: Path) -> int | None:
+        """Copy in the clients from another clients.json (e.g. the "data"
+        folder older versions kept next to the .exe) - once per source folder.
+
+        Clients already here are kept as they are; only missing ones are
+        added. The source folder is remembered, so it is never imported again
+        (a client deleted later can't come back). The source is not changed.
+        Returns how many clients were added, or None if this source was
+        already imported or can't be read.
+        """
+        source = str(Path(other_file).resolve())
+        with self._lock:
+            done = []
+            if self._imports_path.exists():
+                try:
+                    done = json.loads(self._imports_path.read_text(encoding="utf-8"))
+                except ValueError:
+                    done = []
+            if any(os.path.normcase(source) == os.path.normcase(d) for d in done):
+                return None
+            try:
+                incoming = json.loads(Path(other_file).read_text(encoding="utf-8") or "{}")
+                if not isinstance(incoming, dict):
+                    return None
+            except (OSError, ValueError):
+                return None
+            data = self._read()
+            added = 0
+            for cid, c in incoming.items():
+                if valid_id(cid) and isinstance(c, dict) and cid not in data:
+                    data[cid] = dict(clean_client(c), id=cid, created_at=c.get("created_at", ""),
+                                     updated_at=c.get("updated_at", ""))
+                    added += 1
+            if added:
+                self._write(data)
+            self._imports_path.parent.mkdir(parents=True, exist_ok=True)
+            self._imports_path.write_text(json.dumps(done + [source], indent=2), encoding="utf-8")
+            return added
+
 
 def find_project(client: dict, project_id: str | None) -> dict | None:
     for p in client.get("projects", []):

@@ -30,10 +30,15 @@ fills in the State, and the rest can be typed in. The app uses Microsoft Edge
 WebView2, which is part of Windows 10 and 11. On the rare PC without it, the
 tool opens in your web browser instead.
 
-Your clients are saved in a **`data`** folder next to `IPO Form Filler.exe`.
+**Your clients stay on this computer.** They're saved in one fixed place for
+your Windows user: `%LOCALAPPDATA%\IPO Form Filler\data`. The Home screen
+shows the full path and has an **Open folder** button, useful for backups.
 
-**Updating to a newer version:** copy that `data` folder next to the new
-`IPO Form Filler.exe`.
+- **Updating:** download the new version and run it. It uses the same clients
+  automatically, wherever you keep the `.exe`. There's nothing to copy.
+- **Moving from v1.1–1.2.1:** those versions kept a `data` folder next to the
+  `.exe`. The first time the new version runs from that folder, it brings those
+  clients in once and tells you. The old folder can then be deleted.
 
 > **Windows warnings.** The app isn't code-signed yet, so Windows doesn't
 > recognise it.
@@ -167,7 +172,7 @@ What is filled in and what is left blank:
 | `server.py` | Local web server and API |
 | `ipoforms/prefill.py` | Matches client details to the fields of each form |
 | `ipoforms/docx_writer.py` | Writes the Word document |
-| `ipoforms/store.py` | Saves clients in `data/clients.json` |
+| `ipoforms/store.py` | Saves clients in `clients.json` in the data folder |
 | `forms/definitions/` | Field-by-field definition of each IPO form |
 | `forms/official/` | Official blank PDFs |
 | `web/` | The interface (HTML/CSS/JS) |
@@ -176,8 +181,9 @@ What is filled in and what is left blank:
 | `tools/build_exe.py` | Builds `IPO Form Filler.exe` and `downloads/IPO-Form-Filler-Windows.zip` with PyInstaller; see the file for set-up |
 | `ipoforms/paths.py` | Where bundled files and client data live, both from source and as the `.exe` |
 
-**Backups:** all client data is in `data/clients.json`. Copy that file to back
-up your clients.
+**Backups:** all client data is in one file, `clients.json`. For the app it's
+in `%LOCALAPPDATA%\IPO Form Filler\data`; when run from the code, it's in
+`data/`. Copy that file to back up your clients.
 
 - **Automatic backup:** every save also keeps the previous version as
   `data/clients.backup.json`. If `clients.json` is ever damaged, the app says

@@ -4,6 +4,11 @@ build/
 # The .exe is published inside downloads/IPO-Form-Filler-Windows.zip
 downloads/*.exe
 
-# Client details are private: never commit anything in data/ except the placeholder.
+# Client details are private: never commit any data folder or client file,
+# wherever it appears (e.g. an .exe run from downloads/ creates downloads/data/).
 data/*
-!data/.gitkeep
+!/data/.gitkeep
+**/data/
+clients.json
+clients.backup.json
+*.tmp

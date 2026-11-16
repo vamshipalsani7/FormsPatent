@@ -243,7 +243,8 @@ window.addEventListener("DOMContentLoaded", route);
 async function pageHome() {
   app.oninput = app.onchange = app.onclick = null;   // drop the client page's handlers
   const seq = routeSeq;
-  const [clients, forms] = await Promise.all([api("GET", "/api/clients"), getForms()]);
+  const [clients, forms, instance] = await Promise.all([api("GET", "/api/clients"), getForms(),
+    api("GET", "/api/instance").catch(() => null)]);
   if (seq !== routeSeq) return;
   document.title = "IPO Form Filler";
   const nProj = (c) => (c.projects || []).length;
@@ -286,7 +287,17 @@ async function pageHome() {
       <div id="rows">
         ${clients.length ? clients.map(clientRow).join("") : '<div class="empty">No clients yet. Use <b>Add new client</b> to create the first one.</div>'}
       </div>
-    </section>`;
+    </section>
+    ${instance?.data_dir ? `<p class="data-note">
+      <span>Your clients are saved only on this computer, in <code>${esc(instance.data_dir)}</code></span>
+      <button type="button" class="btn link sm" id="open-data" hidden>Open folder</button></p>` : ""}`;
+
+  // In the desktop app: open the data folder (e.g. to back it up).
+  const openData = document.getElementById("open-data");
+  const showOpenData = () => { if (openData && desktopApi()?.open_data_folder) openData.hidden = false; };
+  showOpenData();
+  window.addEventListener("pywebviewready", showOpenData, { once: true });
+  openData?.addEventListener("click", () => desktopApi()?.open_data_folder());
 
   const pick = document.getElementById("pick");
   const open = document.getElementById("open");

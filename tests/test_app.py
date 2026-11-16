@@ -203,27 +203,84 @@ sys.executable = {str(exe_dir / 'IPO Form Filler.exe')!r}
 sys.path.insert(0, {str(ROOT)!r})
 from ipoforms import paths
 print(json.dumps({{"resource": str(paths.RESOURCE_ROOT), "data": str(paths.data_dir()),
-                  "temp": paths.running_from_temp()}}))
+                  "temp": paths.running_from_temp(),
+                  "legacy": [str(p) for p in paths.legacy_data_dirs()]}}))
 """
-        env = dict(os.environ, LOCALAPPDATA=str(localappdata))
+        env = dict(os.environ, LOCALAPPDATA=str(localappdata), USERPROFILE=str(localappdata.parent / "user"))
         out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, env=env, timeout=30)
         self.assertEqual(out.returncode, 0, out.stderr)
         return json.loads(out.stdout)
 
-    def test_data_is_saved_next_to_the_exe(self):
-        with tempfile.TemporaryDirectory() as home, tempfile.TemporaryDirectory(dir=ROOT) as app:
-            r = self.run_frozen(Path(app), Path(home) / "_MEI1", Path(home) / "local")
-            self.assertEqual(Path(r["data"]), Path(app) / "data")
-            self.assertEqual(Path(r["resource"]), Path(home) / "_MEI1")
-            self.assertFalse(r["temp"])
+    def test_every_copy_of_the_exe_uses_one_fixed_folder(self):
+        with tempfile.TemporaryDirectory() as home:
+            local = Path(home) / "local"
+            fixed = local / "IPO Form Filler" / "data"
+            for where in ("Downloads/IPO Form Filler", "Desktop/v1.3", "Temp1_IPO-Form-Filler-Windows.zip/x"):
+                exe_dir = Path(home) / where
+                exe_dir.mkdir(parents=True)
+                r = self.run_frozen(exe_dir, Path(home) / "_MEI", local)
+                self.assertEqual(Path(r["data"]), fixed, where)      # same folder, wherever the .exe is
+                self.assertEqual(r["legacy"], [])
+            self.assertEqual(Path(r["resource"]), Path(home) / "_MEI")
 
-    def test_exe_opened_inside_the_zip_saves_data_somewhere_permanent(self):
-        with tempfile.TemporaryDirectory() as tmp:   # Windows runs it from %TEMP%
-            exe_dir = Path(tmp) / "Temp1_IPO-Form-Filler-Windows.zip" / "IPO Form Filler"
-            exe_dir.mkdir(parents=True)
-            r = self.run_frozen(exe_dir, Path(tmp) / "_MEI2", Path(tmp) / "local")
-            self.assertTrue(r["temp"])
-            self.assertEqual(Path(r["data"]), Path(tmp) / "local" / "IPO Form Filler" / "data")
+    def test_old_data_folder_next_to_the_exe_is_found(self):
+        with tempfile.TemporaryDirectory() as home:
+            exe_dir = Path(home) / "Downloads" / "IPO Form Filler"
+            (exe_dir / "data").mkdir(parents=True)
+            (exe_dir / "data" / "clients.json").write_text("{}", encoding="utf-8")
+            r = self.run_frozen(exe_dir, Path(home) / "_MEI", Path(home) / "local")
+            self.assertEqual([Path(p) for p in r["legacy"]], [exe_dir / "data"])
+
+
+    def test_old_copy_unzipped_in_downloads_is_found_from_a_new_folder(self):
+        with tempfile.TemporaryDirectory() as home:
+            old = Path(home) / "user" / "Downloads" / "IPO-Form-Filler-Windows" / "IPO Form Filler" / "data"
+            old.mkdir(parents=True)
+            (old / "clients.json").write_text("{}", encoding="utf-8")
+            new_exe_dir = Path(home) / "user" / "Desktop" / "IPO Form Filler v1.3"
+            new_exe_dir.mkdir(parents=True)
+            r = self.run_frozen(new_exe_dir, Path(home) / "_MEI", Path(home) / "local")
+            self.assertEqual([Path(p) for p in r["legacy"]], [old])
+
+
+class ImportOldClientsTests(unittest.TestCase):
+    """Clients from an older version's folder are brought in exactly once."""
+
+    def setUp(self):
+        from ipoforms.store import ClientStore
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        self.new = ClientStore(base / "new" / "clients.json")
+        self.old_store = ClientStore(base / "old" / "clients.json")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_import_adds_missing_clients_once_and_never_resurrects(self):
+        a = self.old_store.create({"applicants": [{"name": "Old Client A"}]})
+        b = self.old_store.create({"applicants": [{"name": "Old Client B"}]})
+        mine = self.new.create({"applicants": [{"name": "Already Here"}]})
+        self.assertEqual(self.new.import_once(self.old_store.path), 2)
+        names = sorted(c["applicants"][0]["name"] for c in self.new.list())
+        self.assertEqual(names, ["Already Here", "Old Client A", "Old Client B"])
+        self.new.delete(a["id"])                                   # user deletes one later
+        self.assertIsNone(self.new.import_once(self.old_store.path))   # not imported again
+        self.assertIsNone(self.new.get(a["id"]))                   # ...so it doesn't come back
+        self.assertIsNotNone(self.new.get(b["id"]))
+        self.assertIsNotNone(self.new.get(mine["id"]))
+        self.assertEqual(len(self.old_store.list()), 2)            # the old folder is left untouched
+
+    def test_same_id_keeps_the_newer_copy_here(self):
+        c = self.old_store.create({"applicants": [{"name": "Old Name"}]})
+        self.new.path.parent.mkdir(parents=True, exist_ok=True)
+        self.new.path.write_text(json.dumps({c["id"]: dict(c, applicants=[{"name": "Edited Here"}])}), encoding="utf-8")
+        self.assertEqual(self.new.import_once(self.old_store.path), 0)
+        self.assertEqual(self.new.get(c["id"])["applicants"][0]["name"], "Edited Here")
+
+    def test_unreadable_old_file_is_skipped(self):
+        bad = Path(self.tmp.name) / "broken.json"
+        bad.write_text("{ not json", encoding="utf-8")
+        self.assertIsNone(self.new.import_once(bad))
 
 
 if __name__ == "__main__":
