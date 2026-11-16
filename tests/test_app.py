@@ -56,9 +56,10 @@ class PortTests(unittest.TestCase):
         running = server.AppServer(("127.0.0.1", port), server.Handler)
         threading.Thread(target=running.serve_forever, daemon=True).start()
         try:
-            httpd, url = launcher.start_server(server.Handler, port, wait=0)
-            self.assertIsNone(httpd)                      # -> just opens the browser
+            httpd, url, info = launcher.start_server(server.Handler, port, wait=0)
+            self.assertIsNone(httpd)                      # -> shows that copy instead
             self.assertEqual(url, f"http://127.0.0.1:{port}/")
+            self.assertEqual(info["app"], "ipo-form-filler")
         finally:
             running.shutdown(); running.server_close()
 
@@ -68,12 +69,64 @@ class PortTests(unittest.TestCase):
         other = server.AppServer(("127.0.0.1", port), BaseHTTPRequestHandler)   # not our tool
         threading.Thread(target=other.serve_forever, daemon=True).start()
         try:
-            httpd, url = launcher.start_server(server.Handler, port, wait=0)
+            httpd, url, info = launcher.start_server(server.Handler, port, wait=0)
             self.assertIsNotNone(httpd)
             self.assertNotEqual(httpd.server_address[1], port)
             httpd.server_close()
         finally:
             other.shutdown(); other.server_close()
+
+    def test_a_copy_with_a_different_clients_folder_is_not_joined(self):
+        # The bug seen on v1.2.0: a separate copy (e.g. run from the source
+        # folder, no window) held the port, and the app only said "already open".
+        launcher = load_launcher()
+        port = free_port()
+        running = server.AppServer(("127.0.0.1", port), server.Handler)
+        threading.Thread(target=running.serve_forever, daemon=True).start()
+        try:
+            with tempfile.TemporaryDirectory() as elsewhere:
+                httpd, url, info = launcher.start_server(server.Handler, port, wait=0, data_dir=Path(elsewhere))
+            self.assertIsNotNone(httpd)                               # starts its own copy...
+            self.assertNotEqual(httpd.server_address[1], port)        # ...on another port
+            httpd.server_close()
+        finally:
+            running.shutdown(); running.server_close()
+
+    def test_an_older_version_on_the_port_is_not_joined(self):
+        class OldVersion(BaseHTTPRequestHandler):   # v1.1 had /api/forms but no /api/instance
+            def do_GET(self):
+                body, code = (b"[]", 200) if self.path == "/api/forms" else (b"{}", 404)
+                self.send_response(code); self.send_header("Content-Length", str(len(body))); self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a): pass
+        launcher = load_launcher()
+        port = free_port()
+        old = server.AppServer(("127.0.0.1", port), OldVersion)
+        threading.Thread(target=old.serve_forever, daemon=True).start()
+        try:
+            self.assertEqual(launcher.instance_info(port), {"legacy": True})
+            httpd, url, info = launcher.start_server(server.Handler, port, wait=0)
+            self.assertIsNotNone(httpd)
+            httpd.server_close()
+        finally:
+            old.shutdown(); old.server_close()
+
+    def test_second_launch_brings_the_open_window_forward(self):
+        launcher = load_launcher()
+        port = free_port()
+        running = server.AppServer(("127.0.0.1", port), server.Handler)
+        threading.Thread(target=running.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{port}/"
+        calls = []
+        try:
+            self.assertFalse(launcher.focus_existing(url))            # no window yet
+            server.INSTANCE.update(window=True, focus=lambda: calls.append("front"))
+            self.assertTrue(launcher.instance_info(port)["window"])
+            self.assertTrue(launcher.focus_existing(url))
+            self.assertEqual(calls, ["front"])
+        finally:
+            server.INSTANCE.update(window=False, focus=None)
+            running.shutdown(); running.server_close()
 
     def test_launcher_self_test_passes(self):
         env = dict(os.environ, IPO_FORM_FILLER_PORT=str(free_port()))

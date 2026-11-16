@@ -48,35 +48,73 @@ def already_running(port: int) -> bool:
         return False
 
 
-def start_server(handler, port: int = PREFERRED_PORT, wait: float = STARTUP_WAIT, server_class=None):
-    """Serve on `port`, or find that this tool is already running there.
+def instance_info(port: int) -> dict | None:
+    """What is answering on this port: the running copy's details (its data
+    folder, whether it has a window), {"legacy": True} for an older version of
+    this tool, or None for nothing / some other program."""
+    import urllib.error
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/instance", timeout=2) as r:
+            info = json.load(r)
+            return info if isinstance(info, dict) and info.get("app") == "ipo-form-filler" else None
+    except urllib.error.HTTPError:
+        return {"legacy": True} if already_running(port) else None
+    except Exception:
+        return None
 
-    Returns (httpd, url) when this copy is now serving, or (None, url) when
-    another copy of IPO Form Filler already is - including one double-clicked a
-    moment earlier that is still starting. The port is claimed by binding it,
-    so two copies can never both serve the same client data. If some other
-    program holds the port, the next free port is used instead.
+
+def same_folder(a: str | Path, b: str | Path) -> bool:
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def start_server(handler, port: int = PREFERRED_PORT, wait: float = STARTUP_WAIT,
+                 server_class=None, data_dir: Path | None = None):
+    """Serve on `port`, or join the copy of this tool that already serves the
+    same clients.
+
+    Returns (httpd, url, None) when this copy is now serving, or
+    (None, url, info) when another copy using the *same data folder* is
+    already running there - including one double-clicked a moment earlier and
+    still starting. The port is claimed by binding it, so two copies never
+    serve the same client file. Anything else on the port - another program,
+    an older version, or a copy that keeps its clients in a different folder -
+    is left alone and the next free port is used.
     """
     if server_class is None:
         from server import AppServer as server_class   # holds its port exclusively
+    if data_dir is None:
+        from ipoforms.paths import data_dir as _data_dir
+        data_dir = _data_dir()
     deadline = time.monotonic() + wait
     while True:
         try:
             httpd = server_class(("127.0.0.1", port), handler)
-            return httpd, f"http://127.0.0.1:{port}/"
+            return httpd, f"http://127.0.0.1:{port}/", None
         except OSError:
-            if already_running(port):
-                return None, f"http://127.0.0.1:{port}/"
-            if time.monotonic() >= deadline:
-                break
+            info = instance_info(port)
+            if info and not info.get("legacy") and same_folder(info.get("data_dir", ""), data_dir):
+                return None, f"http://127.0.0.1:{port}/", info
+            if info is not None or time.monotonic() >= deadline:
+                break       # a different copy / version: don't share it, use another port
             time.sleep(0.5)   # perhaps another copy is still starting up
     for other in range(port + 1, port + 50):
         try:
             httpd = server_class(("127.0.0.1", other), handler)
-            return httpd, f"http://127.0.0.1:{other}/"
+            return httpd, f"http://127.0.0.1:{other}/", None
         except OSError:
             continue
     raise RuntimeError(f"No free port found between {port} and {port + 49}.")
+
+
+def focus_existing(url: str) -> bool:
+    """Ask the running copy to bring its window to the front."""
+    try:
+        req = urllib.request.Request(url + "api/instance/focus", method="POST", data=b"{}",
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return bool(json.load(r).get("focused"))
+    except Exception:
+        return False
 
 
 def show_message(title: str, text: str, warning: bool = False) -> None:
@@ -178,14 +216,18 @@ class DesktopApi:
         return True
 
 
-def run_desktop(url: str, check: bool = False) -> bool:
+def run_desktop(url: str, check: bool = False, own_server: bool = True) -> bool:
     """Open the tool in its own window. Returns False if that isn't possible
-    here (no pywebview / no WebView2), so the caller can use the browser."""
+    here (no pywebview / no WebView2), so the caller can use the browser.
+
+    own_server: this process runs the server behind the window, so later
+    launches can find this window and bring it to the front."""
     try:
         import webview
     except Exception:
         return False
     from ipoforms import paths
+    import server
 
     api = DesktopApi(url)
     result = {"loaded": False}
@@ -195,7 +237,16 @@ def run_desktop(url: str, check: bool = False) -> bool:
     api._window = window  # private: not exposed to the page
     webview.settings["OPEN_EXTERNAL_LINKS_IN_BROWSER"] = True
 
+    def bring_to_front() -> None:
+        """Called when the app is started again while this window is open."""
+        window.restore()
+        window.show()
+        window.on_top = True     # pop above other windows...
+        window.on_top = False    # ...without staying pinned there
+
     def after_start() -> None:
+        if own_server:
+            server.INSTANCE.update(window=True, focus=None if check else bring_to_front)
         if not check:
             return
         # --check-desktop: wait until the page has drawn its home screen, then close.
@@ -205,7 +256,9 @@ def run_desktop(url: str, check: bool = False) -> bool:
                 if window.evaluate_js("!!document.querySelector('#pick') && "
                                       "typeof window.pywebview?.api?.save === 'function' && "
                                       "typeof window.pywebview?.api?.show_pdf === 'function'"):
-                    result["loaded"] = True
+                    # ...and a second launch would see that this copy has a window
+                    with urllib.request.urlopen(url + "api/instance", timeout=5) as r:
+                        result["loaded"] = bool(json.load(r).get("window"))
                     break
             except Exception:
                 pass
@@ -223,6 +276,9 @@ def run_desktop(url: str, check: bool = False) -> bool:
         if check:
             print("desktop window failed:", exc)
         return False
+    finally:
+        if own_server:
+            server.INSTANCE.update(window=False, focus=None)
     if check:
         print("desktop check:", "OK" if result["loaded"] else "FAILED")
         return result["loaded"]
@@ -237,17 +293,18 @@ def main() -> None:
     from ipoforms import paths
 
     port = int(os.environ.get("IPO_FORM_FILLER_PORT", PREFERRED_PORT))
-    httpd, url = start_server(server.Handler, port, wait=0 if check else STARTUP_WAIT)
+    httpd, url, existing = start_server(server.Handler, port, wait=0 if check else STARTUP_WAIT)
     if httpd is None:
+        # Another copy already serves these same clients: never start a second
+        # server - show that copy instead.
         if check:
             print("launcher check: FAILED - another copy is using", url)
             sys.exit(1)
-        if desktop_available():
-            show_message("IPO Form Filler", "IPO Form Filler is already open.\n"
-                         "Look for its window on the taskbar.")
-        else:
-            webbrowser.open(url)
-            show_message("IPO Form Filler", "IPO Form Filler is already running.\nIt has been opened in your browser.")
+        if existing.get("window") and focus_existing(url):
+            return                                   # its window is now in front
+        if run_desktop(url, own_server=False):       # it has no window: open one onto it
+            return
+        webbrowser.open(url)
         return
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
 

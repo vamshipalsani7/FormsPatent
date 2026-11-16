@@ -4,6 +4,8 @@ Run:  python server.py        then open http://127.0.0.1:8765
 
 API
   GET    /api/forms                              catalogue of IPO forms
+  GET    /api/instance                           this running copy: data folder, has a window?
+  POST   /api/instance/focus                     bring this copy's window to the front
   GET    /api/clients                            all saved clients
   POST   /api/clients                            create a client
   GET    /api/clients/{id}                       one client
@@ -44,6 +46,16 @@ WEB_DIR = RESOURCE_ROOT / "web"
 MAX_BODY = 1_000_000
 
 STORE = ClientStore()
+
+# What this running copy is, so a second launch can decide what to do:
+# bring this copy's window forward, open a window onto it, or - if it keeps
+# its clients in a different folder - start a separate copy.
+INSTANCE: dict = {"window": False, "focus": None}
+
+
+def instance_info() -> dict:
+    return {"app": "ipo-form-filler", "data_dir": str(Path(STORE.path).parent),
+            "window": bool(INSTANCE.get("window"))}
 
 _FORM_RE = re.compile(r"^/api/clients/(c_[0-9a-f]{8})/forms/(form_[0-9a-z]+)(\.docx)?$")
 _CLIENT_RE = re.compile(r"^/api/clients/(c_[0-9a-f]{8})$")
@@ -164,6 +176,8 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(urlparse(self.path).path)
         if path == "/api/forms":
             return self._json(catalog.list_forms())
+        if path == "/api/instance":
+            return self._json(instance_info())
         if path == "/api/clients":
             return self._json(STORE.list())
         m = _POSTCODE_RE.match(path)
@@ -199,6 +213,15 @@ class Handler(BaseHTTPRequestHandler):
         return self._static(WEB_DIR, rel)
 
     def _post(self):
+        if urlparse(self.path).path == "/api/instance/focus":
+            focus = INSTANCE.get("focus")
+            if not callable(focus):
+                return self._json({"focused": False})
+            try:
+                focus()
+                return self._json({"focused": True})
+            except Exception:  # noqa: BLE001 - the window may be closing
+                return self._json({"focused": False})
         if urlparse(self.path).path != "/api/clients":
             return self._error(404, "Unknown endpoint.")
         try:
