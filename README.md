@@ -11,40 +11,53 @@ code lookup, which sends just the PIN/postcode to a public postcode service.
 
 ## Download and run
 
-**[⬇ Download IPO-Form-Filler.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler.zip)** (about 4 MB)
+### Windows: the app (nothing to install)
+
+**[⬇ Download IPO-Form-Filler-Windows.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler-Windows.zip)** (about 16 MB, Windows 10 or 11)
+
+1. Right-click the downloaded zip and choose **Extract All…**. Don't run the app
+   from inside the zip.
+2. Open the extracted folder and double-click **`IPO Form Filler.exe`**.
+3. Your browser opens the tool, and a small window appears with **Open in
+   browser** and **Stop**. Keep that window open while you work; closing it
+   stops the tool.
+
+Your clients are saved in a **`data`** folder next to `IPO Form Filler.exe`.
+
+**Updating to a newer version:** copy that `data` folder next to the new
+`IPO Form Filler.exe`.
+
+> **Windows warnings.** The app isn't code-signed yet, so Windows doesn't
+> recognise it.
+> - **"Windows protected your PC":** click **More info**, then **Run anyway**.
+> - **"Smart App Control blocked an app…"** (Windows 11): there is no way to run
+>   unsigned apps. Use the Python version below instead, which Smart App Control
+>   allows.
+
+### Any computer: the Python version
+
+**[⬇ Download IPO-Form-Filler.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler.zip)** (about 4 MB, needs Python)
 
 1. **Install Python 3.9 or newer** from <https://www.python.org/downloads/>, if
    you don't have it. On Windows, tick **"Add python.exe to PATH"** during
-   installation. Nothing else needs installing.
-2. **Windows only: unblock the zip before unzipping.** Right-click
-   `IPO-Form-Filler.zip`, choose **Properties**, tick **Unblock** at the bottom,
-   then click **OK**. This stops Windows treating the files as "from the
-   internet".
-3. **Unzip** the download anywhere you like, e.g. Documents.
-4. **Start the tool:**
-   - **Windows:** open the `IPO-Form-Filler` folder and double-click
-     **`IPO Form Filler.pyw`**. A small window appears with **Open in browser**
-     and **Stop** buttons. Closing that window stops the tool.
+   installation.
+2. **Windows only:** right-click the zip, choose **Properties**, tick
+   **Unblock**, click **OK**, then **Extract All…**.
+3. **Start the tool:**
+   - **Windows:** double-click **`IPO Form Filler.pyw`**. You get the same small
+     window as the app.
    - **Mac / Linux:** open a terminal in the folder and run `./start.sh`.
-5. Your browser opens at <http://127.0.0.1:8765>.
 
-### If Windows blocks it
-
-| What you see | What to do |
+| If you see… | Do this |
 |---|---|
-| **"Windows protected your PC"** (blue box) | Click **More info**, then **Run anyway**. Or unblock the zip as in step 2 and unzip it again. |
-| **"Smart App Control blocked…"** (Windows 11) | Use **`IPO Form Filler.pyw`**, not the `.bat` file. If that's blocked too, open **Command Prompt** in the folder and type `py server.py`. |
-| Double-clicking the `.pyw` file does nothing, or opens a text editor | Python isn't installed, or wasn't installed for all file types. Reinstall Python from python.org with default options. Or use **`Start IPO Form Filler.bat`** instead. |
-| **Windows Defender Firewall** asks about Python | Click **Cancel** or **Allow** — either is fine. The tool only talks to your own computer. |
-| Antivirus warns about the `.bat` file | The `.bat` only starts Python with `server.py`; you can open it in Notepad to check. Prefer the `.pyw` file. |
+| **"Windows protected your PC"** | Click **More info**, then **Run anyway**, or unblock the zip first (step 2). |
+| The `.pyw` file opens in a text editor, or does nothing | Python isn't installed for all users / file types. Reinstall it from python.org with default options, or use `Start IPO Form Filler.bat`. |
+| **Windows Defender Firewall** asks about Python | Either button is fine. The tool only talks to your own computer. |
 
-`Start IPO Form Filler.bat` is still included. It does the same thing but shows
-a black console window.
+**From the code:** clone this repository and run `python server.py`.
 
-**Updating to a newer version:** download and unzip the new copy. Then copy the
-`data` folder from your old copy into the new one, to keep your clients.
-
-**From the code instead:** clone this repository and run `python server.py`.
+Starting the tool a second time doesn't start a second copy; it simply opens
+the one already running.
 
 ## How it works
 
@@ -150,7 +163,9 @@ What is filled in and what is left blank:
 | `forms/official/` | Official blank PDFs |
 | `web/` | The interface (HTML/CSS/JS) |
 | `tests/` | `python -m unittest discover -s tests` |
-| `tools/make_release.py` | Rebuilds `downloads/IPO-Form-Filler.zip`: `python tools/make_release.py 1.0.1` |
+| `tools/make_release.py` | Rebuilds `downloads/IPO-Form-Filler.zip`, the Python version: `python tools/make_release.py 1.1.0` |
+| `tools/build_exe.py` | Builds `IPO Form Filler.exe` and `downloads/IPO-Form-Filler-Windows.zip` with PyInstaller; see the file for set-up |
+| `ipoforms/paths.py` | Where bundled files and client data live, both from source and as the `.exe` |
 
 **Backups:** all client data is in `data/clients.json`. Copy that file to back
 up your clients.

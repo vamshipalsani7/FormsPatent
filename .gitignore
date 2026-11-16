@@ -1,5 +1,8 @@
 __pycache__/
 *.pyc
+build/
+# The .exe is published inside downloads/IPO-Form-Filler-Windows.zip
+downloads/*.exe
 
 # Client details are private: never commit anything in data/ except the placeholder.
 data/*

@@ -12,9 +12,17 @@ from datetime import datetime
 from pathlib import Path
 
 from . import postcode_format, validation as V
-from .catalog import ROOT
+from .paths import data_dir
 
-DEFAULT_PATH = ROOT / "data" / "clients.json"
+
+class _DefaultPath(os.PathLike):
+    """data/clients.json, resolved only when first used (so importing never
+    creates folders)."""
+    def __fspath__(self) -> str:
+        return str(data_dir() / "clients.json")
+
+
+DEFAULT_PATH = _DefaultPath()
 _ID_RE = re.compile(r"^c_[0-9a-f]{8}$")
 
 PERSON_FIELDS = ("name", "gender", "age", "nationality", "country_of_residence",

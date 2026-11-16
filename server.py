@@ -22,7 +22,9 @@ from __future__ import annotations
 import argparse
 import json
 import mimetypes
+import os
 import re
+import socket
 import sys
 import webbrowser
 from http import HTTPStatus
@@ -36,8 +38,9 @@ from ipoforms.prefill import build_form
 from ipoforms.store import (ClientStore, ConflictError, StoreError, ValidationError,
                             clean_client, display_name, find_project, project_label)
 
-ROOT = Path(__file__).resolve().parent
-WEB_DIR = ROOT / "web"
+from ipoforms.paths import RESOURCE_ROOT  # noqa: E402
+
+WEB_DIR = RESOURCE_ROOT / "web"
 MAX_BODY = 1_000_000
 
 STORE = ClientStore()
@@ -46,6 +49,22 @@ _FORM_RE = re.compile(r"^/api/clients/(c_[0-9a-f]{8})/forms/(form_[0-9a-z]+)(\.d
 _CLIENT_RE = re.compile(r"^/api/clients/(c_[0-9a-f]{8})$")
 _POSTCODE_RE = re.compile(r"^/api/postcode/([A-Za-z]{2})/([^/]{1,12})$")
 _BLANK_RE = re.compile(r"^/api/forms/(form_[0-9a-z]+)/blank\.docx$")
+
+
+class AppServer(ThreadingHTTPServer):
+    """The HTTP server, holding its port exclusively.
+
+    Python's HTTPServer sets SO_REUSEADDR, which on Windows lets a second copy
+    of the tool bind the very same port - two servers then share one address
+    and one client file. Here a busy port is refused instead.
+    """
+    allow_reuse_address = os.name != "nt"   # still allowed on Mac/Linux (fast restarts)
+    daemon_threads = True
+
+    def server_bind(self):
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):   # Windows
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 def _attachment(name: str) -> str:
@@ -252,7 +271,14 @@ def main():
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-browser", action="store_true")
     args = ap.parse_args()
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
+    try:
+        httpd = AppServer(("127.0.0.1", args.port), Handler)
+    except OSError:
+        url = f"http://127.0.0.1:{args.port}/"
+        print(f"Port {args.port} is already in use - IPO Form Filler may already be running at {url}")
+        if not args.no_browser:
+            webbrowser.open(url)
+        sys.exit(1)
     url = f"http://127.0.0.1:{args.port}/"
     print(f"IPO Form Filler running at {url}  (Ctrl+C to stop)")
     if not args.no_browser:

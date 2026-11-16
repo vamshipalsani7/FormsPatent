@@ -11,7 +11,8 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+from .paths import RESOURCE_ROOT as ROOT   # bundled, read-only files
+
 DEFINITIONS_DIR = ROOT / "forms" / "definitions"
 OFFICIAL_DIR = ROOT / "forms" / "official"
 
