@@ -16,13 +16,30 @@ code lookup, which sends just the PIN/postcode to a public postcode service.
 1. **Install Python 3.9 or newer** from <https://www.python.org/downloads/>, if
    you don't have it. On Windows, tick **"Add python.exe to PATH"** during
    installation. Nothing else needs installing.
-2. **Unzip** the download anywhere you like, e.g. Documents.
-3. **Start the tool:**
+2. **Windows only: unblock the zip before unzipping.** Right-click
+   `IPO-Form-Filler.zip`, choose **Properties**, tick **Unblock** at the bottom,
+   then click **OK**. This stops Windows treating the files as "from the
+   internet".
+3. **Unzip** the download anywhere you like, e.g. Documents.
+4. **Start the tool:**
    - **Windows:** open the `IPO-Form-Filler` folder and double-click
-     **`Start IPO Form Filler.bat`**.
+     **`IPO Form Filler.pyw`**. A small window appears with **Open in browser**
+     and **Stop** buttons. Closing that window stops the tool.
    - **Mac / Linux:** open a terminal in the folder and run `./start.sh`.
-4. Your browser opens at <http://127.0.0.1:8765>. Keep the small black window
-   open while you work; closing it stops the tool.
+5. Your browser opens at <http://127.0.0.1:8765>.
+
+### If Windows blocks it
+
+| What you see | What to do |
+|---|---|
+| **"Windows protected your PC"** (blue box) | Click **More info**, then **Run anyway**. Or unblock the zip as in step 2 and unzip it again. |
+| **"Smart App Control blocked…"** (Windows 11) | Use **`IPO Form Filler.pyw`**, not the `.bat` file. If that's blocked too, open **Command Prompt** in the folder and type `py server.py`. |
+| Double-clicking the `.pyw` file does nothing, or opens a text editor | Python isn't installed, or wasn't installed for all file types. Reinstall Python from python.org with default options. Or use **`Start IPO Form Filler.bat`** instead. |
+| **Windows Defender Firewall** asks about Python | Click **Cancel** or **Allow** — either is fine. The tool only talks to your own computer. |
+| Antivirus warns about the `.bat` file | The `.bat` only starts Python with `server.py`; you can open it in Notepad to check. Prefer the `.pyw` file. |
+
+`Start IPO Form Filler.bat` is still included. It does the same thing but shows
+a black console window.
 
 **Updating to a newer version:** download and unzip the new copy. Then copy the
 `data` folder from your old copy into the new one, to keep your clients.
@@ -124,6 +141,7 @@ What is filled in and what is left blank:
 
 | Path | What it is |
 |---|---|
+| `IPO Form Filler.pyw` | Windows starter: runs without a console, with an Open / Stop window |
 | `server.py` | Local web server and API |
 | `ipoforms/prefill.py` | Matches client details to the fields of each form |
 | `ipoforms/docx_writer.py` | Writes the Word document |

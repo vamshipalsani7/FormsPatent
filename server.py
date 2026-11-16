@@ -63,6 +63,8 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "IPOFormFiller/1.0"
 
     def log_message(self, fmt, *args):  # quieter console
+        if sys.stderr is None:          # started without a console (pythonw)
+            return
         if "/api/" in (args[0] if args else ""):
             sys.stderr.write("%s  %s\n" % (self.log_date_time_string(), fmt % args))
 
