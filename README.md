@@ -13,14 +13,22 @@ code lookup, which sends just the PIN/postcode to a public postcode service.
 
 ### Windows: the app (nothing to install)
 
-**[⬇ Download IPO-Form-Filler-Windows.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler-Windows.zip)** (about 16 MB, Windows 10 or 11)
+**[⬇ Download IPO-Form-Filler-Windows.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler-Windows.zip)** (about 20 MB, Windows 10 or 11)
 
 1. Right-click the downloaded zip and choose **Extract All…**. Don't run the app
    from inside the zip.
 2. Open the extracted folder and double-click **`IPO Form Filler.exe`**.
-3. Your browser opens the tool, and a small window appears with **Open in
-   browser** and **Stop**. Keep that window open while you work; closing it
-   stops the tool.
+3. The tool opens in **its own window**; no web browser is involved. Closing
+   the window stops it.
+   - **Download buttons** open a normal Windows "Save As" dialog. After saving,
+     click the message to open the file in Word.
+   - **View official PDF** opens the blank government form in a separate window.
+
+**Works offline.** The only feature that needs internet is the automatic PIN
+code look-up (city, state, areas). Without a connection, an Indian PIN still
+fills in the State, and the rest can be typed in. The app uses Microsoft Edge
+WebView2, which is part of Windows 10 and 11. On the rare PC without it, the
+tool opens in your web browser instead.
 
 Your clients are saved in a **`data`** folder next to `IPO Form Filler.exe`.
 
@@ -44,8 +52,9 @@ Your clients are saved in a **`data`** folder next to `IPO Form Filler.exe`.
 2. **Windows only:** right-click the zip, choose **Properties**, tick
    **Unblock**, click **OK**, then **Extract All…**.
 3. **Start the tool:**
-   - **Windows:** double-click **`IPO Form Filler.pyw`**. You get the same small
-     window as the app.
+   - **Windows:** double-click **`IPO Form Filler.pyw`**. It opens in your
+     browser with a small Open / Stop window. To get the app's own window
+     instead, first run `py -m pip install pywebview`.
    - **Mac / Linux:** open a terminal in the folder and run `./start.sh`.
 
 | If you see… | Do this |
@@ -154,7 +163,7 @@ What is filled in and what is left blank:
 
 | Path | What it is |
 |---|---|
-| `IPO Form Filler.pyw` | Windows starter: runs without a console, with an Open / Stop window |
+| `IPO Form Filler.pyw` | Starts the tool: in its own window (pywebview) when available, otherwise in the browser. The `.exe` is built from it. |
 | `server.py` | Local web server and API |
 | `ipoforms/prefill.py` | Matches client details to the fields of each form |
 | `ipoforms/docx_writer.py` | Writes the Word document |

@@ -1,9 +1,10 @@
 """Build the Windows application: downloads/IPO Form Filler.exe (+ a zip of it).
 
-Needs PyInstaller (and Pillow for the icon), ideally in a separate venv:
+Needs PyInstaller, pywebview (the app's own window) and Pillow (icon), ideally
+in a separate venv:
 
     python -m venv buildenv
-    buildenv\\Scripts\\python -m pip install pyinstaller pillow
+    buildenv\\Scripts\\python -m pip install pyinstaller pywebview pillow
     buildenv\\Scripts\\python tools\\build_exe.py 1.1.0
 
 The .exe contains Python, the web pages, the form definitions and the official
@@ -32,9 +33,10 @@ README_TXT = """IPO Form Filler {version}
 Fills in Indian Patent Office forms (Form 1 to 31, incl. 7A, 8A, 18A) from
 saved client details and downloads them as editable Word documents.
 
-To start: double-click "IPO Form Filler.exe". Your browser opens the tool and
-a small window appears - keep it open while you work; closing it stops the tool.
-Nothing needs installing.
+To start: double-click "IPO Form Filler.exe". It opens in its own window -
+no browser needed, and it works without internet (only the automatic PIN code
+look-up needs a connection). Closing the window stops the tool.
+Nothing needs installing (it uses Microsoft Edge WebView2, built into Windows 10/11).
 
 Your client details are saved in the "data" folder created next to the .exe.
 To move to a new version, copy that "data" folder next to the new .exe.
@@ -74,6 +76,10 @@ def main() -> None:
     if not ICON.exists():
         subprocess.run([sys.executable, str(ROOT / "tools" / "make_icon.py")], check=True)
     BUILD.mkdir(exist_ok=True)
+    try:
+        import webview  # noqa: F401  - the .exe must include its own window
+    except ImportError:
+        sys.exit("pywebview is not installed in this Python: pip install pywebview")
     sep = ";"   # PyInstaller --add-data separator on Windows
     cmd = [
         sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onefile", "--windowed",

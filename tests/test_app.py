@@ -83,6 +83,61 @@ class PortTests(unittest.TestCase):
         self.assertIn("launcher check: OK", out.stdout)
 
 
+class DesktopSaveTests(unittest.TestCase):
+    """The desktop window's "Save As" path, with the dialog stood in for."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.launcher = load_launcher()
+        cls.httpd = server.AppServer(("127.0.0.1", 0), server.Handler)
+        cls.url = f"http://127.0.0.1:{cls.httpd.server_address[1]}/"
+        threading.Thread(target=cls.httpd.serve_forever, daemon=True).start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown(); cls.httpd.server_close()
+
+    def api_with_dialog(self, answer):
+        api = self.launcher.DesktopApi(self.url)
+        seen = {}
+
+        class FakeWindow:
+            def create_file_dialog(self, kind, **kw):
+                seen.update(kw)
+                return answer
+        api._window = FakeWindow()
+        return api, seen
+
+    def test_save_writes_the_file_with_the_servers_name_and_extension(self):
+        try:
+            import webview  # noqa: F401
+        except ImportError:
+            self.skipTest("pywebview not installed (only needed for the desktop app)")
+        with tempfile.TemporaryDirectory() as d:
+            target = Path(d) / "my copy"          # user typed a name without ".docx"
+            api, seen = self.api_with_dialog((str(target),))
+            res = api.save("/api/forms/form_10/blank.docx")
+            self.assertEqual(seen["save_filename"], "Form 10 - blank.docx")
+            self.assertEqual(Path(res["saved"]).name, "my copy.docx")
+            self.assertTrue(Path(res["saved"]).read_bytes().startswith(b"PK"))   # a real .docx (zip)
+
+    def test_cancel_and_bad_paths(self):
+        try:
+            import webview  # noqa: F401
+        except ImportError:
+            self.skipTest("pywebview not installed (only needed for the desktop app)")
+        api, _ = self.api_with_dialog(None)
+        self.assertEqual(api.save("/api/forms/form_10/blank.docx"), {"cancelled": True})
+        self.assertIn("error", api.save("https://example.com/x.docx"))      # only the tool's own files
+        self.assertFalse(api.show_pdf("/api/clients"))                       # only official PDFs
+        self.assertFalse(api.open_file(str(ROOT / "no-such-file.docx")))
+
+    def test_page_bridge_does_not_expose_internals(self):
+        api = self.launcher.DesktopApi(self.url)
+        public = sorted(n for n in vars(api) if not n.startswith("_"))
+        self.assertEqual(public, [])   # pywebview would otherwise walk them from another thread
+
+
 class PackagedPathTests(unittest.TestCase):
     """Imitate the packaged .exe (sys.frozen) in a separate Python process."""
 

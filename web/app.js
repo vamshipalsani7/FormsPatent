@@ -18,14 +18,39 @@ async function api(method, url, body) {
 }
 
 let toastTimer;
-function toast(msg, isError = false) {
+// onClick: makes the message clickable (e.g. "click to open" after saving).
+function toast(msg, isError = false, onClick = null) {
   const t = document.getElementById("toast");
   t.textContent = msg;
-  t.className = "toast" + (isError ? " error" : "");
+  t.className = "toast" + (isError ? " error" : "") + (onClick ? " action" : "");
+  t.onclick = onClick ? () => { t.hidden = true; onClick(); } : null;
   t.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => (t.hidden = true), 2800);
+  toastTimer = setTimeout(() => (t.hidden = true), onClick ? 8000 : 2800);
 }
+
+// ------------------------------------------------------------------ desktop app
+// In the Windows app the page runs in its own window (pywebview), not a
+// browser: downloads go through a "Save As" dialog and PDFs open in a window.
+const desktopApi = () => window.pywebview?.api || null;
+document.addEventListener("click", async (e) => {
+  const a = e.target.closest?.("a[download], a[target=_blank]");
+  const api = desktopApi();
+  if (!a || !api) return;
+  const href = a.getAttribute("href") || "";
+  if (!href.startsWith("/")) return;     // outside links open in the normal browser
+  e.preventDefault();
+  if (a.hasAttribute("download")) {
+    toast("Choose where to save…");
+    const res = await api.save(href);
+    if (res?.saved) toast(`Saved ${res.name} — click here to open it`, false, () => api.open_file(res.saved));
+    else if (res?.error) toast(`Couldn't save: ${res.error}`, true);
+    else document.getElementById("toast").hidden = true;   // cancelled
+  } else {
+    api.show_pdf(href, document.title.replace(/ – .*/, "") + " (official blank PDF)");
+  }
+});
+window.addEventListener("pywebviewready", () => document.documentElement.classList.add("desktop"));
 
 const getPath = (obj, path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
 function setPath(obj, path, value) {
