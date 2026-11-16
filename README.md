@@ -5,19 +5,29 @@ details. You enter a client's common details once, then download any of the 34
 current IPO forms (Form 1 to Form 31, including 7A, 8A and 18A) as an editable
 Word document with those details already filled in.
 
-This is a separate project from `Patent Forms`. It only uses copies of that
-project's form definitions and official PDFs.
+Everything runs on your own computer. Client details are stored only in the
+tool's `data` folder and are never uploaded anywhere. The one exception is PIN
+code lookup, which sends just the PIN/postcode to a public postcode service.
 
-## Start it
+## Download and run
 
-Double-click **`Start IPO Form Filler.bat`**, or run:
+**[⬇ Download IPO-Form-Filler.zip](https://github.com/vamshipalsani7/FormsPatent/raw/main/downloads/IPO-Form-Filler.zip)** (about 4 MB)
 
-```bash
-python server.py
-```
+1. **Install Python 3.9 or newer** from <https://www.python.org/downloads/>, if
+   you don't have it. On Windows, tick **"Add python.exe to PATH"** during
+   installation. Nothing else needs installing.
+2. **Unzip** the download anywhere you like, e.g. Documents.
+3. **Start the tool:**
+   - **Windows:** open the `IPO-Form-Filler` folder and double-click
+     **`Start IPO Form Filler.bat`**.
+   - **Mac / Linux:** open a terminal in the folder and run `./start.sh`.
+4. Your browser opens at <http://127.0.0.1:8765>. Keep the small black window
+   open while you work; closing it stops the tool.
 
-Your browser opens at <http://127.0.0.1:8765>. You need Python 3.9 or later. No
-packages need installing: the tool uses only Python's standard library.
+**Updating to a newer version:** download and unzip the new copy. Then copy the
+`data` folder from your old copy into the new one, to keep your clients.
+
+**From the code instead:** clone this repository and run `python server.py`.
 
 ## How it works
 
@@ -122,6 +132,7 @@ What is filled in and what is left blank:
 | `forms/official/` | Official blank PDFs |
 | `web/` | The interface (HTML/CSS/JS) |
 | `tests/` | `python -m unittest discover -s tests` |
+| `tools/make_release.py` | Rebuilds `downloads/IPO-Form-Filler.zip`: `python tools/make_release.py 1.0.1` |
 
 **Backups:** all client data is in `data/clients.json`. Copy that file to back
 up your clients.
