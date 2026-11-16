@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+
+# Client details are private: never commit anything in data/ except the placeholder.
+data/*
+!data/.gitkeep
